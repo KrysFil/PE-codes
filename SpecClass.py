@@ -331,12 +331,23 @@ class spectrum_analyzer:
         plt.show()
 
     def fitter(self, new_model, new_model_fit):
+        """
+        A method for fitting the expected model to measured data in order to get 'possible'
+        results for passive components. Warning, only the product of these 'results' is valid,
+        in order to determine the components separately, you need to perform additional measurement, for example
+        measuring the resistance of the circuit. The reason: results are not independent (?) so many fits are possible.
+        :param new_model: New model from tf which you think will fit data better.
+        :param new_model_fit: New model_fit from tf for fitting the data.
+        :return: Changed model with found parameters in class. If you run amplitude_plotter next,
+        you will see the new theoretical prediction in the plot.
+        """
         # noinspection PyTupleAssignmentBalance
         params, pcov = curve_fit(new_model_fit, self.freqs_voor_test,
                                  self.resultaten_amp, sigma=self.std_amp, absolute_sigma=True)
         self.model = new_model(*params)
-        print(print(params))
-        print(pcov)
+        print(print(params))            # Prints the list of found fit parameters.
+        print(pcov)                     # Matrix of covariances, currently not working.
+
 
 if __name__ == "__main__":
     spek = spectrum_analyzer(2, 50000, 50, 3, 1, 10000, 1)

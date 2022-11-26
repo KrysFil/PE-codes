@@ -63,16 +63,16 @@ class mydaq:
                 for index, nummer in enumerate(self.channel):
                     readTask.ai_channels.add_ai_voltage_chan(f'myDAQ1/ai{self.channel[index]}')
                     writeTask.ao_channels.add_ao_voltage_chan(f'myDAQ1/ao{self.channel[index]}')
-            elif one_write_channel is not None and one_read_channel is None:
+            elif one_write_channel is not None and type(one_write_channel) is int and one_read_channel is None:
                 writeTask.ao_channels.add_ao_voltage_chan(f'myDAQ1/ao{one_write_channel}')
                 for index, nummer in enumerate(self.channel):
                     readTask.ai_channels.add_ai_voltage_chan(f'myDAQ1/ai{self.channel[index]}')
-            elif one_write_channel is None and one_read_channel is not None:
+            elif one_write_channel is None and one_read_channel is not None and type(one_read_channel) is int:
                 readTask.ai_channels.add_ai_voltage_chan(f'myDAQ1/ai{one_read_channel}')
                 for index, nummer in enumerate(self.channel):
                     writeTask.ao_channels.add_ao_voltage_chan(f'myDAQ1/ao{self.channel[index]}')
             else:
-                TypeError
+                raise TypeError("one_read_channel or one_write_channel should be an integer")
             writeTask.timing.cfg_samp_clk_timing(self.rate, sample_mode=dx.constants.AcquisitionType.FINITE,
                                                  samps_per_chan=self.samples)
             readTask.timing.cfg_samp_clk_timing(self.rate, sample_mode=dx.constants.AcquisitionType.FINITE,
