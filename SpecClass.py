@@ -7,6 +7,7 @@ import numpy as np
 from scipy import integrate
 import matplotlib.pyplot as plt
 import transfers as tf
+from tqdm import tqdm
 
 class spectrum_analyzer:
 
@@ -105,9 +106,8 @@ class spectrum_analyzer:
         """
         print(f"Predicted waiting time: {self.duration*self.repeats_freq*self.datapunten_freq*2}")
         if len(self.channels) == 1:
-            for i in range(self.repeats_freq):
-                print(f"Started loop {i}")
-                for index, freq in enumerate(self.freqs_voor_test):
+            for index, freq in enumerate(tqdm(self.freqs_voor_test),ascii=True,desc="Frequencies:"):
+                for i in tqdm(range(self.repeats_freq),ascii=True,leave=False,desc="Repeats:"):
                     meting1 = self.data_saver(freq)
                     self.meting[:, i, index] = meting1
             if save:
@@ -115,9 +115,8 @@ class spectrum_analyzer:
             return self.meting
 
         elif len(self.channels) == 2:
-            for i in range(self.repeats_freq):
-                print(f"Started loop {i}")
-                for index, freq in enumerate(self.freqs_voor_test):
+            for index, freq in enumerate(tqdm(self.freqs_voor_test),ascii=True,desc="Frequencies:"):
+                for i in tqdm(range(self.repeats_freq),ascii=True,leave=False,desc="Repeats:"):
                     meting0, meting1 = self.data_saver(freq)
                     self.meting[:, i, index, 0] = meting0  # Output
                     self.meting[:, i, index, 1] = meting1  # Input
