@@ -24,6 +24,6 @@ for i,index in product(range(100),range(10)):
 """
 k = 5
 j = 10
-for index,freq in enumerate(tqdm(range(j),ascii=True,desc="Frequencies:")):
-    for i in tqdm(range(k),ascii=True,leave=False,desc="Repeats:"):
+for index,freq in enumerate(tqdm(range(j),desc="Frequencies:", colour="green")):
+    for i in tqdm(range(k),leave=False,desc="Repeats:", colour="blue"):
         sleep(2)
