@@ -240,8 +240,8 @@ class spectrum_analyzer:
                                      self.resultaten_amp[(inter + 1):], 1, cov=True)
             self.cutoff_freq = self.freqs_voor_test[inter]
             errs = np.sqrt(np.diag(pcov))
-            print(slope[0])             # Slope of the transfer function
-            print(errs)                 # Error in the slope
+            print(f"The slope of the transfer function is: {slope[0]} dB/dec.")     # Slope of the transfer function
+            print(f"The error is {errs[0]} dB/dec")                                 # Error in the slope
 
         plt.figure(figsize=(8, 5), dpi=300)
         plt.plot(self.freqs_voor_test, self.resultaten_amp, label="Experimental result", c="k", ls="--")
@@ -330,7 +330,7 @@ class spectrum_analyzer:
         plt.savefig("Polar_bode_plot")
         plt.show()
 
-    def fitter(self, new_model, new_model_fit):
+    def fitter(self, new_model, new_model_fit, guess):
         """
         A method for fitting the expected model to measured data in order to get 'possible'
         results for passive components. Warning, only the product of these 'results' is valid,
@@ -338,22 +338,24 @@ class spectrum_analyzer:
         measuring the resistance of the circuit. The reason: results are not independent (?) so many fits are possible.
         :param new_model: New model from tf which you think will fit data better.
         :param new_model_fit: New model_fit from tf for fitting the data.
+        :param guess: A guess for initial parameters, as a list.
         :return: Changed model with found parameters in class. If you run amplitude_plotter next,
         you will see the new theoretical prediction in the plot.
         """
         # noinspection PyTupleAssignmentBalance
-        params, pcov = curve_fit(new_model_fit, self.freqs_voor_test,
-                                 self.resultaten_amp, sigma=self.std_amp, absolute_sigma=True)
+        params, pcov = curve_fit(new_model_fit, self.freqs_voor_test, self.resultaten_amp,
+                                 p0=guess, sigma=self.std_amp, absolute_sigma=True)
         self.model = new_model(*params)
-        print(print(params))            # Prints the list of found fit parameters.
-        print(pcov)                     # Matrix of covariances, currently not working.
+        errs_fit = np.sqrt(np.diag(pcov))
+        print(f"Found fit parameters are {params}")                 # Prints the list of found fit parameters.
+        print(f"Error for the found parameters is: {errs_fit}")     # Errors in the fit.
 
 
 if __name__ == "__main__":
-    spek = spectrum_analyzer(2, 50000, 50, 3, 1, 10000, 1)
-    spek.meting = np.load("flak1.npy")
+    spek = spectrum_analyzer(1, 20000, 20, 5, 10, 10000, 1)
+    spek.meting = np.load("metingen/testdata.npy")
     spek.magnitude_plotter()
-    spek.fitter(tf.R_C, tf.R_C_fit)
+    spek.fitter(tf.R_C, tf.R_C_fit, [1e6,1e-9])
     spek.magnitude_plotter()
     #spek.phase_plotter()
     #spek.polar_plotter(method="out/in")
