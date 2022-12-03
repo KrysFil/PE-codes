@@ -216,51 +216,113 @@ class spectrum_analyzer:
         else:
             raise TypeError(" Choose 'dummy' or 'out/in' with 'bode' or 'transfer' ")
 
+    def slope_finder(self, mode):
+        """A function finding the closest index of 3 dB point and the slope of the transfer function. The mode can be
+        either 'left', 'right' or 'both' and it sets on which side of the 3 dB point slope calculation happens.
+        It returns the (mean) slope and its error and the index of the 3 dB point.
+        These informations will also be printed to the console."""
+        find = np.where(np.logical_and((self.resultaten_amp >= -4), (self.resultaten_amp <= -2)))
+        indexDbPoint = int(np.round(np.mean(np.array(find)), 0))
+        cutoff_freq = self.freqs_voor_test[indexDbPoint]
+        if mode == "right":
+            # noinspection PyTupleAssignmentBalance
+            slope, pcov = np.polyfit(np.log10(self.freqs_voor_test[(indexDbPoint + 1):]),
+                                     self.resultaten_amp[(indexDbPoint + 1):], 1, cov=True)
+            errs = np.sqrt(np.diag(pcov))[0]
+            print(f"Found cutoff frequency is {cutoff_freq:.1f} Hz")
+            print(f"The slope of the transfer function is: {slope[0]} dB/dec.")  # Slope of the transfer function
+            print(f"The error is {errs} dB/dec\n")  # Error in the slope
+            return slope[0], errs, indexDbPoint
+
+        elif mode == "left":
+            # noinspection PyTupleAssignmentBalance
+            slope, pcov = np.polyfit(np.log10(self.freqs_voor_test[:(indexDbPoint - 1)]),
+                                     self.resultaten_amp[:(indexDbPoint - 1)], 1, cov=True)
+
+            errs = np.sqrt(np.diag(pcov))[0]
+            print(f"Found cutoff frequency is {cutoff_freq:.1f} Hz")
+            print(f"The slope of the transfer function is: {slope[0]} dB/dec.")  # Slope of the transfer function
+            print(f"The error is {errs} dB/dec\n")  # Error in the slope
+            return slope[0], errs, indexDbPoint
+
+        elif mode == "both":    # Vreselijk gehardcoded, maar tis moeilijk.
+            indexDbPoint = [indexDbPoint, indexDbPoint]
+            diff = np.diff(find)
+            if max(diff) > 1:
+                split_diff = np.where(max(diff) > 1, diff)
+                if len(split_diff) == 1:
+                    left_dB = int(np.round(np.mean(np.array(find[:split_diff])), 0))
+                    right_dB = int(np.round(np.mean(np.array(find[split_diff+1:])), 0))
+                    indexDbPoint = [left_dB, right_dB]
+                else:
+                    NotImplementedError("Not implemented yet, sorry.")
+            else:
+                pass
+            cutoff_freq = self.freqs_voor_test[indexDbPoint]
+            # noinspection PyTupleAssignmentBalance
+            rightSlope, rightPcov = np.polyfit(np.log10(self.freqs_voor_test[(indexDbPoint[1] + 1):]),
+                                     self.resultaten_amp[(indexDbPoint[1] + 1):], 1, cov=True)
+            # noinspection PyTupleAssignmentBalance
+            leftSlope, leftPcov = np.polyfit(np.log10(self.freqs_voor_test[:(indexDbPoint[0] - 1)]),
+                                     self.resultaten_amp[:(indexDbPoint[0] - 1)], 1, cov=True)
+            slope = [leftSlope[0], rightSlope[0]]
+            errs1 = np.sqrt(np.diag(leftPcov))[0]
+            errs2 = np.sqrt(np.diag(rightPcov))[0]
+            combSlope = np.mean(slope)
+            combErr =  np.sqrt(errs1**2+errs2**2)
+            print(f"Found cutoff frequencies are {[round(x, 1) for x in cutoff_freq]} Hz")
+            print(f"The left slope is {slope[0]} dB/dec and right one is {slope[1]} dB/dec.")  # Slope of the transfer function
+            print(f"The left error is {errs1} dB/dec and right one is {errs2}")  # Error in the slope
+            print(f"Combined slope is {combSlope} dB/dec and its error is {combErr} dB/dec.\n")
+            return combSlope, combErr, indexDbPoint
+        else:
+            raise TypeError("Choose as mode 'right', 'left' or 'both'.")
+
 
     @timer
-    def magnitude_plotter(self, method="out/in", mode='bode', show_3_dB_point=True, theory=True):
+    def magnitude_plotter(self, method="out/in", mode='bode', calcSlope=True, theory=True):
         """
         Method to calculate and plot bode magnitudes.
         :param mode: Sets the type of magnitude plot. For transfer diagram use 'transfer'.
         For bode plot set to 'bode'. Default is 'bode'.
-        :param show_3_dB_point: If True, shows the -3dB point on the diagram.
+        :param calcSlope: This shows the 3 dB point on the plot and calculates the slope and its error if True.
+        Set to 'left', 'right' or 'both' in the console input, depending on the position of the 3dB point. Def is True.
         :param method: If you want to use dummy method, set to 'dummy'. For output/input method type 'out/in'.
-        :param theory: Plotting the theoretical prediction if True. Def is True.
+        :param theory: Plots theoretical prediction if set to True. Def is True.
         """
+        def mode_choice(mode):
+            if mode == "bode":
+                plt.semilogx()
+                plt.ylabel(" Amplitude (dB)")
+            else:
+                plt.ylabel(" Amplitude ")
 
         bode_heights = self.choosing_method(method=method, mode=mode)
         self.resultaten_amp = np.mean(bode_heights, 0)
         self.std_amp = np.std(bode_heights, 0)
 
-        if show_3_dB_point:
-            find = np.where(np.logical_and((self.resultaten_amp >= -4), (self.resultaten_amp <= -2)))
-            inter = int(np.round(np.mean(np.array(find)), 0))
-            # noinspection PyTupleAssignmentBalance
-            slope, pcov = np.polyfit(np.log10(self.freqs_voor_test[(inter + 1):]),
-                                     self.resultaten_amp[(inter + 1):], 1, cov=True)
-            self.cutoff_freq = self.freqs_voor_test[inter]
-            errs = np.sqrt(np.diag(pcov))
-            print(f"The slope of the transfer function is: {slope[0]} dB/dec.")     # Slope of the transfer function
-            print(f"The error is {errs[0]} dB/dec\n")                                 # Error in the slope
-
         plt.figure(figsize=(8, 5), dpi=300)
         plt.plot(self.freqs_voor_test, self.resultaten_amp, label="Experimental result", c="k", ls="--")
-        if theory:
-            plt.plot(self.freqs_voor_test, self.ideal_theory(self.freqs_voor_test, mode='amplitude'),
-                    label="Theoritical prediction", c="deepskyblue", ls="-")
         plt.errorbar(self.freqs_voor_test, self.resultaten_amp, yerr=self.std_amp, fmt="o",
                      label="Measurement error", c="r", markersize=5)
-        if show_3_dB_point:
-            plt.scatter(self.freqs_voor_test[inter], self.resultaten_amp[inter], c="dodgerblue", s=100, marker="X",
-                        label=f" Closest measurement to\n-3dB point at {self.cutoff_freq:.1f} Hz\nThe slope is {slope[0]:.1f} dB/dec")
+        if calcSlope:
+            mode_choice(mode)
+            plt.show()
+            choice = input("What is your choice?\n")
+            slope, errs, _ = self.slope_finder(choice)
+            plt.figure(figsize=(8, 5), dpi=300)
+            plt.plot(self.freqs_voor_test, self.resultaten_amp, label="Experimental result", c="k", ls="--")
+            plt.errorbar(self.freqs_voor_test, self.resultaten_amp, yerr=self.std_amp, fmt="o",
+                         label="Measurement error", c="r", markersize=5)
+            # plt.scatter(self.freqs_voor_test[inter], self.resultaten_amp[inter], c="dodgerblue", s=100, marker="X",
+            #             label=f" Closest measurement to\n-3dB point at {cutoff_freq} Hz\nThe slope is {slope:.1f} dB/dec")
+        if theory:
+            plt.plot(self.freqs_voor_test, self.ideal_theory(self.freqs_voor_test, mode='amplitude'),
+                     label="Theoritical prediction", c="deepskyblue", ls="-")
         plt.title(" The amplitude diagram of a RC-filter ")
         plt.xlabel(" Frequency (Hz)")
         plt.legend()
-        if mode == "bode":
-            plt.semilogx()
-            plt.ylabel(" Amplitude (dB)")
-        else:
-            plt.ylabel(" Amplitude ")
+        mode_choice(mode)
         plt.savefig("Amplitude_bode_plot")
         plt.show()
 
@@ -352,6 +414,6 @@ if __name__ == "__main__":
     spek.magnitude_plotter()
     spek.fitter(tf.R_C_fit, [100])
     spek.model = tf.R_C(1e6, 7.9e-10)
-    spek.magnitude_plotter()
+    spek.magnitude_plotter(calcSlope=False)
     #spek.phase_plotter()
     #spek.polar_plotter(method="out/in")
