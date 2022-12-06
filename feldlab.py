@@ -1,29 +1,24 @@
-import itertools
-
+import sympy
 import numpy as np
-from tqdm import trange,tqdm
-from tqdm.contrib.itertools import product
-from time import *
-"""
-from SpecClass import *
-def saver(save=[0,1]):
-    if save:
-        print(f"{save}")
-        print(type(save))
-        print(type(f'{save}'))
-    else:
-        print("Not saved!")
+from matplotlib import pyplot as plt
+from sympy import symbols, simplify, lambdify, I, pi, Abs, expand, log
 
-saver(tf.R_C)
-saver()
-"""
-"""
-a = [1,2,3,4,5,6,7,8,5,2,1,3,56]
-for i,index in product(range(100),range(10)):
-    sleep(0.01)
-"""
-k = 5
-j = 10
-for index,freq in enumerate(tqdm(range(j),desc="Frequencies:", colour="green")):
-    for i in tqdm(range(k),leave=False,desc="Repeats:", colour="blue"):
-        sleep(2)
+f,R,C,L,Rc,Cc = symbols("f R C L Rc Cc", real=True)
+f_r,Q,f_0 = symbols("f_r Q f_0", real=True)
+
+freq = np.logspace(1,4,1000)
+
+RL_C = 1/(1+I*2*pi*R*C-(2*pi*f)**2*L*C)
+C_Rc = (I * 2 * pi * f * Rc * Cc) / (1 + I * 2 * pi * f * Rc * Cc)
+
+
+funk = RL_C*C_Rc
+sub = funk.subs([(R*C,1/(2*pi*Q*f_r)),(L*C,1/(2*pi*f_r)**2),
+           (Rc*Cc,1/(2*pi*f_0))])
+print(sub)
+sub = 20*log(Abs(sub),10)
+print(sub)
+fuss = lambdify([f,f_r,Q,f_0],sub)
+plt.plot(freq,fuss(freq,100,10,1000))
+plt.semilogx()
+plt.show()
