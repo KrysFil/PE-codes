@@ -9,10 +9,11 @@ import matplotlib.pyplot as plt
 import transfers as tf
 from tqdm import tqdm
 
+
 class spectrum_analyzer:
 
     def __init__(self, duration, sample_rate, datapunten_freq, repeats_freq, begin_freq, eind_freq,
-                 amplitude, model=tf.R_C(1e6,1e-9), channels=[0,1]):
+                 amplitude, model=tf.model(tf.R_C,R=1e6,C=1e-9), channels=[0,1]):
         """
         :param duration: Time length of the measurement
         :param sample_rate: Sample rate to set for MyDAQ
@@ -125,6 +126,7 @@ class spectrum_analyzer:
                 np.save(f"{save}", self.meting)
             return self.meting
 
+
     def bode_rekener(self, freq_signal, data, width=10, dummy_freq=700):
         """
         Deprecated method.
@@ -141,6 +143,7 @@ class spectrum_analyzer:
         dummypower = self.power(self.freq_as, fjes, dummy_freq, width * self.df)  # Power of the dummy signal
         height_bode = 20 * np.log10(np.abs((powerpiek / dummypower) ** (1 / 2)))
         return height_bode
+
 
     def alternatieve_bode(self, width=10, mode="bode"):
         """
@@ -167,6 +170,7 @@ class spectrum_analyzer:
                 else:
                     raise TypeError("Choose either 'bode' or 'transfer'")
         return bode_heights
+
 
     def amplitude_lijster(self, meting, save=True):
         """
@@ -232,7 +236,7 @@ class spectrum_analyzer:
             print(f"Found cutoff frequency is {cutoff_freq:.1f} Hz")
             print(f"The slope of the transfer function is: {slope[0]} dB/dec.")  # Slope of the transfer function
             print(f"The error is {errs} dB/dec\n")  # Error in the slope
-            return slope[0], errs, indexDbPoint
+            return slope[0], errs
 
         elif mode == "left":
             # noinspection PyTupleAssignmentBalance
@@ -243,7 +247,7 @@ class spectrum_analyzer:
             print(f"Found cutoff frequency is {cutoff_freq:.1f} Hz")
             print(f"The slope of the transfer function is: {slope[0]} dB/dec.")  # Slope of the transfer function
             print(f"The error is {errs} dB/dec\n")  # Error in the slope
-            return slope[0], errs, indexDbPoint
+            return slope[0], errs
 
         elif mode == "both":    # Vreselijk gehardcoded, maar tis moeilijk.
             indexDbPoint = [indexDbPoint, indexDbPoint]
@@ -274,15 +278,38 @@ class spectrum_analyzer:
             print(f"The left slope is {slope[0]} dB/dec and right one is {slope[1]} dB/dec.")  # Slope of the transfer function
             print(f"The left error is {errs1} dB/dec and right one is {errs2}")  # Error in the slope
             print(f"Combined slope is {combSlope} dB/dec and its error is {combErr} dB/dec.\n")
-            return combSlope, combErr, indexDbPoint
+            return combSlope, combErr
         else:
             raise TypeError("Choose as mode 'right', 'left' or 'both'.")
 
+    def arbitrarySlope(self, startFreq, mode):
+        """Function based on slope_finder with exception that it does not start from 3dB but arbitrary startFreq"""
+        start = np.where(np.logical_and((self.resultaten_amp >= startFreq+100), (self.resultaten_amp <= startFreq-100)))
+        start = int(np.mean(start))
+        if mode == "right":
+            # noinspection PyTupleAssignmentBalance
+            slope, pcov = np.polyfit(np.log10(self.freqs_voor_test[start:]),
+                                     self.resultaten_amp[start:], 1, cov=True)
+            errs = np.sqrt(np.diag(pcov))[0]
+            print(f"The slope of the transfer function is: {slope[0]} dB/dec.")  # Slope of the transfer function
+            print(f"The error is {errs} dB/dec\n")  # Error in the slope
+            return slope[0], errs
+
+        elif mode == "left":
+            # noinspection PyTupleAssignmentBalance
+            slope, pcov = np.polyfit(np.log10(self.freqs_voor_test[:start]),
+                                     self.resultaten_amp[:start], 1, cov=True)
+
+            errs = np.sqrt(np.diag(pcov))[0]
+            print(f"The slope of the transfer function is: {slope[0]} dB/dec.")  # Slope of the transfer function
+            print(f"The error is {errs} dB/dec\n")  # Error in the slope
+            return slope[0], errs
 
     @timer
-    def magnitude_plotter(self, method="out/in", mode='bode', calcSlope=True, theory=True):
+    def magnitude_plotter(self, method="out/in", mode='bode', calcSlope=True, theory=True, helpMe=None):
         """
         Method to calculate and plot bode magnitudes.
+        :param helpMe: If set to particular frequency, uses arbitrarySlope to calculate the slope.
         :param mode: Sets the type of magnitude plot. For transfer diagram use 'transfer'.
         For bode plot set to 'bode'. Default is 'bode'.
         :param calcSlope: This shows the 3 dB point on the plot and calculates the slope and its error if True.
@@ -309,7 +336,10 @@ class spectrum_analyzer:
             mode_choice(mode)
             plt.show()
             choice = input("What is your choice?\n")
-            slope, errs, _ = self.slope_finder(choice)
+            if helpMe is not None:
+                slope, errs = self.arbitrarySlope(helpMe,choice)
+            else:
+                slope, errs = self.slope_finder(choice)
             plt.figure(figsize=(8, 5), dpi=300)
             plt.plot(self.freqs_voor_test, self.resultaten_amp, label="Experimental result", c="k", ls="--")
             plt.errorbar(self.freqs_voor_test, self.resultaten_amp, yerr=self.std_amp, fmt="o",
@@ -409,11 +439,12 @@ class spectrum_analyzer:
 
 
 if __name__ == "__main__":
+    funk = tf.fitModel(tf.R_C)
     spek = spectrum_analyzer(1, 20000, 20, 5, 10, 10000, 1)
     spek.meting = np.load("metingen/testdata.npy")
     spek.magnitude_plotter()
-    spek.fitter(tf.R_C_fit, [100])
-    spek.model = tf.R_C(1e6, 7.9e-10)
+    params,_ = spek.fitter(funk, [100])
+    spek.model = tf.model(tf.R_C,R=1e6,C=7.9e-10)
     spek.magnitude_plotter(calcSlope=False)
     #spek.phase_plotter()
     #spek.polar_plotter(method="out/in")
